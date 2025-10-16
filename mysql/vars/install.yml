@@ -1,0 +1,3 @@
+db: testdb
+db_user: root
+mysql_root_password: P@$$w0rd

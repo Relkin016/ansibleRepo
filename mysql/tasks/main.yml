@@ -1,0 +1,58 @@
+- name: Include vars in task
+  include_vars: mysql/vars/install.yml
+
+- name: SetUp UFW
+  include_tasks: mysql/tasks/ufw.yml
+
+- name: Install mysql
+  apt: name=mysql-server state=latest update_cache=yes
+  notify: restart mysql
+
+- name: Install mysql-client
+  apt: name=mysql-client state=latest
+
+- name: Enable mysql
+  systemd_service:
+    name: mysql
+    state: started
+    enabled: true
+    masked: no
+  become: true
+
+- name: Secure MySQL installation with expect
+  expect:
+    command: mysql_secure_installation
+    responses:
+      'Enter current password for root': '' # Empty for initial setup
+      'Set root password': 'y'
+      'New password': '{{ mysql_root_password }}'
+      'Re-enter new password': '{{ mysql_root_password }}'
+      'Remove anonymous users': 'y'
+      'Disallow root login remotely': 'y'
+      'Remove test database and access to it': 'y'
+      'Reload privilege tables now': 'y'
+    timeout: 10 # Adjust timeout as needed
+
+- name: "Install ansible python3 mysql dependency"
+  apt:
+    name: python3-mysqldb
+    state: latest
+
+- name: Initialize test DB
+  mysql_db:
+    name: "{{ db }}"
+    state: present
+    login_user: "{{ db_user }}"
+    login_password: "{{ mysql_root_password }}"
+
+#- name: add sample data to db
+#  copy:
+#    src: test.sql
+#    dest: /tmp/test.sql
+#- name: insert sample data into db
+#  mysql_db:
+#    name: testdb
+#    state: import
+#    target: /tmp/dump.sql
+#    login_user: root
+#    login_password: "{{ mysql_root_password }}"

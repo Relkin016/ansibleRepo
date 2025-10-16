@@ -1,0 +1,30 @@
+- name: Add Time ENV VAR
+  ansible.builtin.cron:
+    name: TIMESTAMP
+    user: roman
+    env: yes
+    job: $(date +%Y%m%d_%H%M%S)
+
+- name: Add Time ENV VAR
+  ansible.builtin.cron:
+    name: BACKUP_NAME
+    user: roman
+    env: yes
+    job: "/home/roman/backups/mysql/mysql_backup_${TIMESTAMP}.sql"
+
+- name: Add a daily backup cron job
+  ansible.builtin.cron:
+    name: Daily Backup Script
+    user: roman
+    minute: 0
+    hour: 3
+    job: "mysqldump -u roman -p1111 –Compress --all-databases > ${BACKUP_NAME} && scp ${BACKUP_NAME} user@192.168.12.41:${BACKUP_NAME}"
+    state: present
+
+- name: Add old backups autoremoving
+  ansible.builtin.cron:
+    user: roman
+    name: "Autoremove Old backups"
+    minute: 0
+    hour: 3
+    job: "find /home/roman/backups/mysql/* -type f -mtime +7 -delete"

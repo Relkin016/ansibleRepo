@@ -1,0 +1,26 @@
+- name: Generate an OpenSSL private key
+  community.crypto.openssl_privatekey:
+    path: /etc/ssl/private/test.key
+    size: 4096
+    type: RSA
+    state: present
+  become: yes
+
+- name: Generate self-signed certificate
+  community.crypto.x509_certificate:
+    path: /etc/ssl/certs/test.pem
+    privatekey_path: /etc/ssl/private/test.key
+    provider: selfsigned
+#    subject:
+#      C: "UA"
+#      ST: "Kyiv"
+#      L: "Kyiv"
+#      O: "Legend"
+#      OU: "CIS"
+#      CN: "test.cis"
+    # Optional: Add Subject Alternative Names (SANs)
+#    subject_alt_name:
+#      - "DNS:test.cis"
+#      - "IP:172.20.20.12"
+    # Optional: Set certificate validity period
+#    valid_days: 365

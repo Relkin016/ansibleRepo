@@ -1,0 +1,27 @@
+- name: Include vars
+  include_vars: nginx/vars/install.yml
+- name: Add TLS
+  include_tasks: nginx/tasks/tls.yml
+- name: Add UFW
+  include_tasks: nginx/tasks/ufw.yml
+
+- name: Install nginx
+  apt: name=nginx state=latest update_cache=yes
+
+- name: Create custom document root
+  file: path={{ doc_root }} state=directory owner=www-data group=www-data
+
+- name: Set up HTML file
+  copy: src=index.html dest={{ doc_root }}/index.html owner=www-data group=www-data
+
+- name: Set up apache virt host file
+  copy: src=vhost.tpl dest=/etc/nginx/sites-available/default
+  notify: restart nginx
+
+- name: enable nginx
+  systemd_service:
+    name: nginx
+    state: started
+    enabled: true
+    masked: no
+  become: true
