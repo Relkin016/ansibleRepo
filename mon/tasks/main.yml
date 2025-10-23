@@ -1,0 +1,49 @@
+- name: Select latest ngx expoter ver
+  uri:
+    url: https://api.github.com/repos/nginx/nginx-prometheus-exporter/releases/latest
+    method: GET
+    return_content: yes
+   register: ver
+   run_once: true
+
+- name: get arhive url
+  set_fact:
+    download_url: "{{ ver.json.tarball_url }}"
+
+- name: Check dir
+  file:
+    path: "{{ ngx_exporter_bin_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Deploy ngx_export
+  unarchive:
+    src: "{{ download_url }}"
+    dest: "{{ ngx_exporter_bin_dir: }}"
+
+- name: Install nginx
+  copy:
+    src: "{{ download_url }}"
+    dest: "{{ ngx_exporter_bin_dir: }}"
+    extra_opts: ['--strip-components=1']
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: ngx_exp_ver
+  debug:
+     msg:
+       - "Версия: {{ release_info.json.tag_name }}"
+
+- name: Add nginx-exporter systemd
+  copy:
+    scr: files/nginx-exporter.service
+    dest: "{{ ngx_systemd_dir }}"
+
+- name: Run nginx-exporter authomatically
+  systemd_service:
+    name: nginx-exporter
+    state: started
+    enabled: true
+    masked: no
+  become: true

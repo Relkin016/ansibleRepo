@@ -1,0 +1,4 @@
+vars:
+  ngx_export_dir: nginx-exporter/
+  ngx_systemd_dir: /etc/systemd/system/{{ ngx_export_dir }}
+  ngx_exporter_bin_dir: /etc/bin/{{ ngx_export_dir }}

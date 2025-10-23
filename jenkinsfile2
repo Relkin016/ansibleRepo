@@ -1,0 +1,89 @@
+// Jenkinsfile
+pipeline {
+    agent any // Виконується на Monitoring VM, де встановлено Docker та Ansible
+
+    environment {
+        // Змінні для Container Registry (замініть на свої дані)
+        IMAGE_NAME = "ghcr.io/your-org/your-app"
+        IMAGE_TAG = "${env.BUILD_NUMBER}-${GIT_COMMIT, length: 8}"
+        
+        // ID облікових даних Registry, збережених у Jenkins Credentials
+        REGISTRY_CREDENTIALS = 'github-container-registry-creds' 
+        
+        // Шлях до вашого Ansible Playbook в репозиторії
+        DEPLOY_PLAYBOOK = 'ansible/deploy_app.yml'
+    }
+
+    stages {
+        
+        // 1. Збірка коду та образу
+        stage('Build Docker Image') {
+            steps {
+                checkout scm
+                
+                script {
+                    // Використовуємо Jenkins/Monitoring VM для збірки
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
+                }
+            }
+        }
+
+        // 2. Пуш у GitHub Container Registry (GHCR)
+        stage('Push to Registry') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: REGISTRY_CREDENTIALS,
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    // Логін у GHCR
+                    sh "echo \$DOCKER_PASS | docker login ghcr.io -u \$DOCKER_USER --password-stdin"
+                    // Пуш образу
+                    sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
+                }
+            }
+        }
+        
+        // 3. Тестування (CI/Unit/Integration)
+        stage('Test') {
+            steps {
+                echo 'Running unit/integration tests...'
+                // Приклад: Запуск тестів всередині контейнера або curl-тести
+                // sh 'docker run --rm my-app-image npm test'
+            }
+        }
+
+        // 4. Деплой через Ansible (запускається на Monitoring VM)
+        stage('Deploy to Application VM') {
+            steps {
+                echo 'Starting Ansible deployment...'
+                
+                // Передача змінної з новим тегом образу в Playbook
+                sh "ansible-playbook ${DEPLOY_PLAYBOOK} -i ansible/inventory/production \
+                    -e \"app_image_tag=${IMAGE_TAG}\" \
+                    -e \"app_image_name=${IMAGE_NAME}\""
+            }
+        }
+        
+        // 5. Тестування працездатності після деплою (Curl Test)
+        stage('Post-Deploy Health Check') {
+            steps {
+                echo 'Checking application health...'
+                // Запуск curl-тесту для перевірки, що вебзастосунок відповідає (з Monitoring VM)
+                sh "curl -f -k --connect-timeout 5 https://${APPLICATION_VM_HOST_OR_IP}"
+            }
+        }
+    }
+    
+    // Бонус: Повідомлення про статус деплою
+    post {
+        failure {
+            // Використовуйте Jenkins Notification Plugins (наприклад, Telegram, Slack)
+            script {
+                // Відправити повідомлення про невдалий деплой
+                echo "Deployment FAILED! Check Jenkins job: ${env.JOB_URL}" 
+                // slackSend channel: '#alerts', message: "Deploy failed: ${env.JOB_NAME}"
+            }
+        }
+    }
+}

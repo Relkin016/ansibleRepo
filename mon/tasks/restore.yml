@@ -1,0 +1,64 @@
+1. Stop nginx
+4. restart nginx
+5. checking
+
+- name: Include vars
+  iclude_vars: mysql.yml
+
+- name: Stop nginx
+  systemd:
+    name: nginx
+    state: stopped
+  become: yes
+
+- name: Find the latest MySQL dump file
+    find:
+      paths: "{{ backup_dir }}"
+      patterns: "*.sql"
+      recurse: no
+      sortby: mtime
+    register: latest_dump
+
+- name: Ensure a dump file was found
+    ansible.builtin.assert:
+      that:
+        - latest_dump.files | length > 0
+      fail_msg: "No SQL dump files found in {{ backup_dir }}"
+
+- name: Get the path of the newest dump file
+  ansible.builtin.set_fact:
+    latest_dump_path: "{{ latest_dump.files[-1].path }}"
+
+- name: Remove existing database (Optional, but sometimes needed before a full restore)
+  mysql_db:
+    name: "{{ db_name }}"
+    state: absent
+    login_user: "{{ db_user }}"
+    login_password: "{{ mysql_root_password }}"
+      # Дополнительные параметры подключения, если нужно (login_host, login_port и т.д.)
+
+- name: Create database again (if removed)
+  mysql_db:
+    name: "{{ db_name }}"
+    state: present
+    login_user: "{{ db_user }}"
+    login_password: "{{ mysql_root_password }}"
+
+- name: Import the latest MySQL dump file
+  mysql_db:
+    name: "{{ db_name }}"
+    state: import
+    target: "{{ latest_dump_path }}"
+    login_user: "{{ db_user }}"
+    login_password: "{{ mysql_root_password }}
+  register: import_result
+
+- name: Display import result
+  debug:
+    msg: "Import completed. Changed: {{ import_result.changed }}"
+
+- name: Start nginx
+  systemd:
+    name: nginx
+    state: started
+  become: yes
