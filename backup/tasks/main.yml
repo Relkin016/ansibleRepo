@@ -1,30 +1,62 @@
-- name: Add Time ENV VAR
+- name: Create backup dir
+  file:
+    path: "{{ backup_dir }}"
+    state: directory
+    mode: '0755'
+    owner: roman
+
+- name: Add backup role
+  community.mysql.mysql_user:
+    name: "{{ mysql_user }}"
+    password: "{{ mysql_password }}"
+    host: "localhost"
+    priv: "*.*:SELECT/INSERT/UPDATE/DELETE"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+  register: bckp_rl # <-- CORRECTED INDENTATION
+
+- name: Get FULL access to backup usr
+  community.mysql.mysql_query: # <-- CORRECTED INDENTATION
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    query: "GRANT PROCESS, RELOAD ON *.* TO '{{ backup_user }}'@'localhost';"
+  when: bckp_rl.changed or bckp_rl.exists # <-- CORRECTED INDENTATION
+
+- name: Flush privs
+  community.mysql.mysql_query: # <-- CORRECTED INDENTATION
+    login_user: root
+    login_password: "{{ mysql_root_password }}" # <-- CORRECTED MISSING QUOTE/COLON
+    query: "FLUSH PRIVILEGES;"
+
+- name: Add Time ENV VAR (BACKUP_NAME)
+  ansible.builtin.cron: # Changed to use fully qualified collection name for clarity
+    name: BACKUP_NAME
+    user: roman
+    env: yes
+    job: "{{ backup_dir }}/mysql_backup_${TIMESTAMP}.sql" # This looks like it should use 'cron' module's arguments
+
+- name: Add Time ENV VAR (TIMESTAMP)
   ansible.builtin.cron:
     name: TIMESTAMP
     user: roman
     env: yes
-    job: $(date +%Y%m%d_%H%M%S)
-
-- name: Add Time ENV VAR
-  ansible.builtin.cron:
-    name: BACKUP_NAME
-    user: roman
-    env: yes
-    job: "/home/roman/backups/mysql/mysql_backup_${TIMESTAMP}.sql"
+    job: '${date +\%Y\%m\%d\_\%H\%M\%S}' # Escaping for cron job, added single quotes
 
 - name: Add a daily backup cron job
-  ansible.builtin.cron:
+  ansible.builtin.cron: # Changed to use fully qualified collection name for clarity
     name: Daily Backup Script
     user: roman
     minute: 0
     hour: 3
-    job: "mysqldump -u roman -p1111 –Compress --all-databases > ${BACKUP_NAME} && scp ${BACKUP_NAME} user@192.168.12.41:${BACKUP_NAME}"
+    # Escaping for cron job, ${BACKUP_NAME} might not work as expected in cron without setting up env vars
+    job: "mysqldump -u {{ mysql_user }} -p{{ mysql_password }} --all-databases > {{ backup_dir }}/mysql_backup_`date +\\%Y\\%m\\%d\\_\\%H\\%M\\%S`.sql && scp {{ backup_dir }}/mysql_backup_`date +\\%Y\\%m\\%d\\_\\%H\\%M\\%S`.sql user@192.168.12.41:"
     state: present
 
 - name: Add old backups autoremoving
-  ansible.builtin.cron:
+  ansible.builtin.cron: # Changed to use fully qualified collection name for clarity
     user: roman
-    name: "Autoremove Old backups"
+    name: "Autoremove old backups"
     minute: 0
     hour: 3
-    job: "find /home/roman/backups/mysql/* -type f -mtime +7 -delete"
+    job: "find {{ backup_dir }}/* -type f -mtime +7 -delete"

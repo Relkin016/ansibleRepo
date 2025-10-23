@@ -1,5 +1,5 @@
-vars:
-  db_user: root
-  mysql_root_password: P@$$w0rd
-  db: testdb
-  backup_dir: /home/roman/backups/mysql
+mysql_user: backup
+mysql_root_password: P@$$w0rd
+db: testdb
+backup_dir: "/home/roman/backups/mysql"
+mysql_password: 1111

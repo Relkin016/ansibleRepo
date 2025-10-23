@@ -31,7 +31,7 @@
       'Disallow root login remotely': 'y'
       'Remove test database and access to it': 'y'
       'Reload privilege tables now': 'y'
-    timeout: 10 # Adjust timeout as needed
+    timeout: 10
 
 - name: "Install ansible python3 mysql dependency"
   apt:
